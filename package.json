@@ -1,0 +1,24 @@
+{
+  "name": "ai-interviewer",
+  "version": "1.0.0",
+  "description": "AI-powered interview practice application with real-time feedback",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["ai", "interview", "practice", "gemini", "node.js", "express"],
+  "author": "Sudharshan Seetaram Hegde",
+  "license": "ISC",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0"
+  }
+}

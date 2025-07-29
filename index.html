@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interviewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .container {
+            max-width: 100vw;
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            background: white;
+            border-radius: 0;
+            box-shadow: none;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+            padding: 0;
+            margin: 0;
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .setup-area {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .setup-area h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        #resume-input {
+            width: 100%;
+            height: 120px;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+
+        #resume-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #start-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        #start-button:hover {
+            transform: translateY(-1px);
+        }
+
+        #start-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .chat-interface {
+            padding: 20px;
+            display: none;
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .chat-interface.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #chat-container {
+            flex: 1;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            padding: 15px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            background-color: #fafafa;
+            min-height: 0;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            max-width: 80%;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .message.ai {
+            background-color: #f5f5f5;
+            border-left: 4px solid #666;
+            margin-right: auto;
+        }
+
+        .message.user {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.evaluation {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .message-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 12px;
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+
+        #chat-form {
+            display: flex;
+            gap: 10px;
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 10px 0;
+            margin-top: auto;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            min-height: 60px;
+            max-height: 150px;
+            resize: vertical;
+        }
+
+        #user-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #send-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+
+        #send-button:hover {
+            transform: translateY(-1px);
+        }
+
+        #send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+
+        .status-bar {
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>AI Interviewer</h1>
+            <p>Practice your interview skills with AI-powered questions</p>
+        </div>
+
+        <!-- Setup Area -->
+        <div class="setup-area" id="setup-area">
+            <h2>Setup Your Interview</h2>
+            <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+                📝 Paste your resume below to get personalized questions<br>
+                💬 Answer as many questions as you like<br>
+                🙏 Say "thank you" when you want to end the session
+            </p>
+            <textarea 
+                id="resume-input" 
+                placeholder="Paste your resume or job description here. This will help the AI generate relevant interview questions for your background and the position you're applying for."
+            ></textarea>
+            <button id="start-button">Start Interview</button>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="chat-interface" id="chat-interface">
+            <div id="chat-container">
+                <!-- Messages will be dynamically added here -->
+            </div>
+            
+            <form id="chat-form">
+                <textarea 
+                    id="user-input" 
+                    placeholder="Type your answer here..." 
+                    autocomplete="off"
+                    rows="3"
+                ></textarea>
+                    required
+                />
+                <button type="submit" id="send-button">Send</button>
+            </form>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <span id="status">Ready to start your interview session</span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
