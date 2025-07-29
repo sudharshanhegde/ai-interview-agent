@@ -13,9 +13,63 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Initialize Gemini AI
+// Initialize Gemini AI (Primary and Backup)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+// Initialize backup Gemini AI if backup key is available
+let backupModel = null;
+if (process.env.GEMINI_BACKUP_API_KEY) {
+    const backupGenAI = new GoogleGenerativeAI(process.env.GEMINI_BACKUP_API_KEY);
+    backupModel = backupGenAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    console.log('Backup Gemini API initialized successfully');
+}
+
+// Enhanced AI call function with backup support
+async function callGeminiAI(prompt, maxRetries = 2) {
+    const providers = [
+        { name: 'Primary Gemini', model: model },
+        ...(backupModel ? [{ name: 'Backup Gemini', model: backupModel }] : [])
+    ];
+    
+    for (const provider of providers) {
+        try {
+            console.log(`Attempting to call ${provider.name}...`);
+            const result = await retryApiCall(async () => {
+                return await provider.model.generateContent(prompt);
+            }, maxRetries);
+            console.log(`${provider.name} responded successfully`);
+            return result;
+        } catch (error) {
+            console.error(`${provider.name} failed:`, error.message);
+            if (provider === providers[providers.length - 1]) {
+                // Last provider failed, throw error
+                throw error;
+            }
+            console.log(`Switching to next provider...`);
+        }
+    }
+}
+
+// Retry function for API calls
+async function retryApiCall(apiFunction, maxRetries = 3, delay = 2000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return await apiFunction();
+        } catch (error) {
+            console.log(`API call attempt ${attempt} failed:`, error.message);
+            
+            if (attempt === maxRetries) {
+                throw error;
+            }
+            
+            // Wait before retrying, with exponential backoff
+            const waitTime = delay * Math.pow(2, attempt - 1);
+            console.log(`Retrying in ${waitTime}ms...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+    }
+}
 
 // Server-side session storage
 const interviewSessions = new Map();
@@ -52,14 +106,15 @@ app.get('/test-ai', async (req, res) => {
         }
 
         const prompt = "Say hello and confirm you're working!";
-        const result = await model.generateContent(prompt);
+        const result = await callGeminiAI(prompt);
         const response = await result.response;
         const text = response.text();
         
         res.json({ 
             success: true, 
             message: 'Gemini AI is working!', 
-            aiResponse: text 
+            aiResponse: text,
+            hasBackup: backupModel !== null
         });
     } catch (error) {
         console.error('Error testing AI:', error);
@@ -99,8 +154,8 @@ Format your response as a JSON array of strings, like this:
 
 Only return the JSON array, nothing else.`;
 
-        // Get questions from AI
-        const result = await model.generateContent(interviewPrompt);
+        // Get questions from AI with backup support
+        const result = await callGeminiAI(interviewPrompt);
         const response = await result.response;
         const aiResponse = response.text().trim();
         
@@ -120,8 +175,8 @@ Only return the JSON array, nothing else.`;
             // Fallback: create default questions
             questions = [
                 "Can you tell me about yourself and your professional background?",
-                "What interests you most about this position?",
-                "Describe a challenging project you've worked on recently."
+                "What interests you most about this position and our company?",
+                "Describe a challenging project you've worked on recently and how you overcame obstacles."
             ];
         }
         
@@ -209,7 +264,7 @@ ${sessionData.answers.map((qa, index) =>
 Based on this interview session, provide brief, constructive feedback on the candidate's performance. Be positive and professional, highlighting strengths and suggesting areas for improvement if any. Keep it concise (2-3 sentences).`;
             
             try {
-                const result = await model.generateContent(feedbackPrompt);
+                const result = await callGeminiAI(feedbackPrompt);
                 const response = await result.response;
                 const feedback = response.text().trim();
                 
@@ -312,7 +367,7 @@ ${sessionData.answers.map((qa, index) =>
 Based on this interview performance, provide a brief overall assessment (2-3 sentences) highlighting the candidate's key strengths and thanking them for their time.`;
 
                 try {
-                    const summaryResult = await model.generateContent(summaryPrompt);
+                    const summaryResult = await callGeminiAI(summaryPrompt);
                     const summaryResponse = await summaryResult.response;
                     overallFeedback = summaryResponse.text().trim();
                 } catch (summaryError) {
@@ -366,8 +421,8 @@ Criteria for evaluation:
 
 Be constructive and encouraging while providing honest feedback. Only return the JSON object, nothing else.`;
 
-        // Call Gemini API for evaluation
-        const result = await model.generateContent(evaluationPrompt);
+        // Call Gemini AI for evaluation with backup support
+        const result = await callGeminiAI(evaluationPrompt);
         const response = await result.response;
         const aiResponse = response.text().trim();
         
@@ -428,7 +483,7 @@ Generate 1 follow-up interview question that:
 Return only the question text, nothing else.`;
 
         try {
-            const nextQuestionResult = await model.generateContent(nextQuestionPrompt);
+            const nextQuestionResult = await callGeminiAI(nextQuestionPrompt);
             const nextQuestionResponse = await nextQuestionResult.response;
             const nextQuestion = nextQuestionResponse.text().trim();
             
